@@ -11,7 +11,7 @@ i = 0
 start = 0
 
 if len(sys.argv) < 3:
-    print("Please provide the number of games and starting point")
+    print("Usage: collect_pong <games> <start_point>")
     exit()
 
 try:
@@ -23,10 +23,15 @@ except:
     exit()
 
 for _ in range(games):
+    count = 0
     while not done:
         o, r, done, info = env.step(env.action_space.sample())
+        count += 1
+        # Ignore first 25 frames of the game, since the games starts after this amount.
+        if count < 25:
+            continue
         img = Image.fromarray(o)
-        img.save("pong_images/pong_" + str(i) + ".png")
+        img.save("images/pong_" + str(i) + ".png")
         i += 1
     done = False
     env.reset()
