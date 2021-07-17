@@ -3,6 +3,7 @@ from functools import reduce
 import tensorflow as tf
 import keras
 from .coord_conv import CoordinateChannel2D
+from .ball_track_metric import ball_track_metric
 
 
 class CAE():
@@ -27,7 +28,8 @@ class CAE():
         decoded_img = self.decoder(encoded_img)
 
         self.model = Model(input_img, decoded_img, name=name)
-        self.model.compile(optimizer='adam', loss='binary_crossentropy')
+        self.model.compile(
+            optimizer='adam', loss='binary_crossentropy', metrics=[ball_track_metric], run_eagerly=True)
 
     def create_encoder(self):
         filters = self.initial_filters
@@ -115,7 +117,9 @@ class CAE():
             )
         )
 
-        return reconstruction_loss.numpy()
+        ball_loss = ball_track_metric(rec, data)
+
+        return {"reconstruction": reconstruction_loss.numpy(), "ball_track": ball_loss.numpy()}
 
 
 class CAECoordConv(CAE):
@@ -140,9 +144,12 @@ class CAECoordConv(CAE):
         encoded = layers.Dense(self.latent_size, name='bottleneck')(flat)
 
         # Saving values for the decoder
-        self.reshaping_shape = x.shape[1:]
         self.final_filters = filters / 2
         self.flat_size = flat.shape[1]
+        # Reshaping shape witll have the same size as original image, and the amount of filters is calculating by
+        # dividing the flat size by the size of the input square, in order to have the same size as the flat size.
+        self.reshaping_shape = (
+            *self.input_shape[:-1], int((self.flat_size) / (self.input_shape[0] * self.input_shape[1])))
 
         return Model(input_img, encoded, name='Encoder')
 
@@ -150,24 +157,25 @@ class CAECoordConv(CAE):
         filters = self.final_filters
 
         input_decoder = Input(shape=(self.latent_size,), name='input_decoder')
+        x = input_decoder
 
-        dec = layers.Dense(self.flat_size, name="decoding")(input_decoder)
+        dec = layers.Dense(self.flat_size, name="decoding")(x)
         reshaped = layers.Reshape(self.reshaping_shape, name='reshape')(dec)
         x = reshaped
+        x = CoordinateChannel2D()(x)
 
         for i in range(self.layers):
-            x = layers.Conv2D(filters, self.kernel_size, activation='relu',
+            # Uber paper has conv layers of kernel 1x1 por decoder
+            x = layers.Conv2D(filters, (1, 1), activation='relu',
                               padding='same', name=f'conv{self.layers-i}_dec')(x)
-            x = layers.UpSampling2D(
-                self.pooling_factor, name=f'upsamp{self.layers-i}')(x)
+            # x = layers.UpSampling2D(
+            #    self.pooling_factor, name=f'upsamp{self.layers-i}')(x)
             filters /= 2
 
         # Calculate the kernel size for the last layer, in order for it to have the same
         # width and height as the input image
         kernel_y = x.shape[1] - self.input_shape[0] + 1
         kernel_x = x.shape[2] - self.input_shape[1] + 1
-
-        x = CoordinateChannel2D()(x)
 
         decoded = layers.Conv2D(
             1, (kernel_y, kernel_x), activation='sigmoid', padding='valid', name='output')(x)
