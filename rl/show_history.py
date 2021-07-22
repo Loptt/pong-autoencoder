@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import pickle
 
-history = pickle.load(open('history_latent.p', 'rb'))
+history = pickle.load(open('history.p', 'rb'))
 
 running_average = []
 window = 100
