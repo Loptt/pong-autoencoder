@@ -7,10 +7,11 @@ from .ball_finder import find_balls, find_balls_tf
 
 
 class VAEInternal(keras.Model):
-    def __init__(self, encoder, decoder, **kwargs):
+    def __init__(self, encoder, decoder, beta=1, **kwargs):
         super(VAEInternal, self).__init__(**kwargs)
         self.encoder = encoder
         self.decoder = decoder
+        self.beta = beta
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="reconstruction_loss"
@@ -44,8 +45,8 @@ class VAEInternal(keras.Model):
                 )
             )
             # Calculate KL loss and total loss
-            kl_loss = -0.5 * (1 + z_log_var -
-                              tf.square(z_mean) - tf.exp(z_log_var))
+            kl_loss = (-0.5 * self.beta) * (1 + z_log_var -
+                                            tf.square(z_mean) - tf.exp(z_log_var))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
             total_loss = reconstruction_loss + kl_loss
 

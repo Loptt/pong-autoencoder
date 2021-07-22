@@ -29,7 +29,7 @@ class CAE():
 
         self.model = Model(input_img, decoded_img, name=name)
         self.model.compile(
-            optimizer='adam', loss='binary_crossentropy', metrics=[ball_track_metric], run_eagerly=True)
+            optimizer='adam', loss='binary_crossentropy')
 
     def create_encoder(self):
         filters = self.initial_filters

@@ -2,6 +2,25 @@
 import numpy as np
 import pickle as pickle
 import gym
+import tensorflow as tf
+import time
+
+from transforms.transform_pong_ballless import conversion_pipe as transform_paddle
+from transforms.transform_pong_paddleless_big import conversion_pipe as transform_ball
+from keras.models import load_model
+from keras.preprocessing.image import img_to_array
+from keras.preprocessing.image import array_to_img
+
+config = tf.compat.v1.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.compat.v1.Session(config=config)
+
+
+ball_model = load_model('../models/vae_big_paddleless')
+paddles_model = load_model('../models/vae_ballless')
+
+latent_size = ball_model.encoder.output_shape[2][1] + \
+    paddles_model.encoder.output_shape[2][1]
 
 # hyperparameters
 H = 200  # number of hidden layer neurons
@@ -11,11 +30,15 @@ gamma = 0.99  # discount factor for reward
 decay_rate = 0.99  # decay factor for RMSProp leaky sum of grad^2
 resume = True  # resume from previous checkpoint?
 render = True
+history = []
+episode_number = 0
 
 # model initialization
-D = 80 * 80  # input dimensionality: 80x80 grid
+D = latent_size * 2  # input dimensionality: 80x80 grid
 if resume:
-    model = pickle.load(open('save.p', 'rb'))
+    model = pickle.load(open('save_latent.p', 'rb'))
+    history = pickle.load(open('history_latent.p', 'rb'))
+    episode_number = len(history)
 else:
     model = {}
     model['W1'] = np.random.randn(H, D) / np.sqrt(D)  # "Xavier" initialization
@@ -75,18 +98,48 @@ def policy_backward(eph, epdlogp):
 env = gym.make("Pong-v0")
 observation = env.reset()
 prev_x = None  # used in computing the difference frame
+prev_latent = None
 xs, hs, dlogps, drs = [], [], [], []
 running_reward = None
 reward_sum = 0
-episode_number = 0
+
+prev_time = time.time()
+current_time = time.time()
+
 while True:
     if render:
         env.render()
+
+    '''
+    prev_time = current_time
+    current_time = time.time()
+
+    print("Frame time:", current_time - prev_time)
 
     # preprocess the observation, set input to network to be difference image
     cur_x = prepro(observation)
     x = cur_x - prev_x if prev_x is not None else np.zeros(D)
     prev_x = cur_x
+    '''
+    ball_image = transform_ball(array_to_img(observation))
+    paddles_image = transform_paddle(array_to_img(observation))
+
+    latent_ball = ball_model.encoder.call(
+        tf.constant([img_to_array(ball_image)]))[2]
+
+    latent_paddles = paddles_model.encoder.call(
+        tf.constant([img_to_array(paddles_image)]))[2]
+
+    latent = np.concatenate(
+        (np.reshape(latent_ball.numpy(), latent_ball.numpy().shape[1]), np.reshape(latent_paddles.numpy(), latent_paddles.numpy().shape[1])), axis=0)
+
+    prev_latent = prev_latent if prev_latent is not None else np.zeros(
+        latent_size)
+
+    x = np.concatenate(
+        (latent, prev_latent), axis=0)
+
+    prev_latent = latent
 
     # forward the policy network and sample an action from the returned probability
     aprob, h = policy_forward(x)
@@ -144,11 +197,14 @@ while True:
             0.99 + reward_sum * 0.01
         print('resetting env. episode reward total was %f. running mean: %f' %
               (reward_sum, running_reward))
-        if episode_number % 100 == 0:
-            pickle.dump(model, open('save.p', 'wb'))
+        history.append((episode_number, reward_sum))
+        if episode_number % 10 == 0:
+            pickle.dump(model, open('save_latent.p', 'wb'))
+            pickle.dump(history, open('history_latent.p', 'wb'))
         reward_sum = 0
         observation = env.reset()  # reset env
         prev_x = None
+        prev_latent = None
 
     if reward != 0:  # Pong has either +1 or -1 reward exactly when game ends.
         print('ep %d: game finished, reward: %f' %

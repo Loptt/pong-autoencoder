@@ -11,11 +11,15 @@ gamma = 0.99  # discount factor for reward
 decay_rate = 0.99  # decay factor for RMSProp leaky sum of grad^2
 resume = True  # resume from previous checkpoint?
 render = True
+history = []
+episode_number = 0
 
 # model initialization
 D = 80 * 80  # input dimensionality: 80x80 grid
 if resume:
     model = pickle.load(open('save.p', 'rb'))
+    history = pickle.load(open('history.p', 'rb'))
+    episode_number = len(history)
 else:
     model = {}
     model['W1'] = np.random.randn(H, D) / np.sqrt(D)  # "Xavier" initialization
@@ -78,7 +82,7 @@ prev_x = None  # used in computing the difference frame
 xs, hs, dlogps, drs = [], [], [], []
 running_reward = None
 reward_sum = 0
-episode_number = 0
+
 while True:
     if render:
         env.render()
@@ -144,8 +148,10 @@ while True:
             0.99 + reward_sum * 0.01
         print('resetting env. episode reward total was %f. running mean: %f' %
               (reward_sum, running_reward))
-        if episode_number % 100 == 0:
+        history.append((episode_number, reward_sum))
+        if episode_number % 50 == 0:
             pickle.dump(model, open('save.p', 'wb'))
+            pickle.dump(history, open('history.p', 'wb'))
         reward_sum = 0
         observation = env.reset()  # reset env
         prev_x = None

@@ -9,7 +9,7 @@ from .coord_conv import CoordinateChannel2D
 
 
 class VAE():
-    def __init__(self, layers, input_shape, latent_size, kernel_size=3, filters=8, name='Autoencoder'):
+    def __init__(self, layers, input_shape, latent_size, kernel_size=3, filters=8, beta=1, name='Autoencoder'):
         self.layers = layers
         self.input_shape = input_shape
         self.latent_size = latent_size
@@ -20,11 +20,13 @@ class VAE():
         self.flat_size = 0
         self.reshaping_shape = (1,)
         self.input_size = reduce((lambda x, y: x*y), input_shape)
+        self.beta = beta
 
         self.encoder = self.create_encoder()
         self.decoder = self.create_decoder()
 
-        self.model = VAEInternal(self.encoder, self.decoder, name=name)
+        self.model = VAEInternal(
+            self.encoder, self.decoder, name=name, beta=beta)
 
         batch_input = list(input_shape)
         batch_input.insert(0, None)
