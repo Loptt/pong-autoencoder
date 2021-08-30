@@ -1,6 +1,7 @@
 import sys
 import os
 import numpy as np
+import tensorflow as tf
 from keras.preprocessing.image import load_img
 from keras.preprocessing.image import img_to_array
 from keras.preprocessing.image import array_to_img
@@ -19,6 +20,13 @@ try:
     end = int(sys.argv[2])
 except:
     print("Invalid arguments: start, end")
+
+if len(tf.config.list_physical_devices('GPU')) < 1:
+    print("GPU cannot be configured")
+    exit()
+else:
+    print("GPU configured properly")
+
 
 # The following numbers represent the fraction of the image to be cropped in the Y and X axis.
 # These numbers come from the experimental analysis done in image_analysis.ipynb
@@ -66,13 +74,54 @@ def maxpool_downscale(img_array):
     return rescaled
 
 
-def conversion_pipe(pil_image):
+def conversion_pipe_slow(pil_image):
     img_gray = pil_image.convert("L")
     img_arr = img_to_array(img_gray)
     img_cropped = img_arr[Y_CROP_START:Y_CROP_END]
     img_cropped = img_cropped[:, X_CROP_START:X_CROP_END]
     img_mono = gray_to_mono(img_cropped)
-    img_resized = maxpool_downscale(img_mono)
+    #img_resized = maxpool_downscale(img_mono)
+    img = array_to_img(img_mono)
+    # img = img.resize(
+    #    (int(img.width * RESIZE_RATIO), int(img.height * RESIZE_RATIO)))
+
+    return img
+
+
+def gray_to_mono_fast(img_array):
+    img_tf = tf.constant(img_array)
+
+    # Experimental analysis reveals the mininum value in the screen is 87.0
+    # So subtract this value to set the minimum to 0.
+    img_tf = img_tf - 87.0
+
+    img_tf = img_tf / 255.0
+    img_tf = tf.math.ceil(img_tf)
+    img_tf = img_tf * 255.0
+
+    return img_tf.numpy()
+
+
+def block_reduce_downscale(img):
+    img_r = np.reshape(img, img.shape[:-1])
+    reduced = block_reduce(img_r, (8, 8), np.max)
+    return np.reshape(reduced, (*reduced.shape, 1))
+
+
+def tf_nn_downscale(img):
+    img_tf = tf.reshape(tf.constant(img), (1, img.shape[0], img.shape[1], 1))
+    # reduced = block_reduce(img_r, (4, 4), np.max)
+    reduced = tf.nn.max_pool(img_tf, ksize=4, strides=4, padding='SAME')
+    reduced = tf.reshape(reduced, reduced.shape[1:])
+    return reduced.numpy()
+
+
+def conversion_pipe(pil_image):
+    img_gray = pil_image.convert("L")
+    img_arr = img_to_array(img_gray)
+    img_cropped = img_arr[Y_CROP_START:Y_CROP_END, X_CROP_START:X_CROP_END]
+    img_mono = gray_to_mono_fast(img_cropped)
+    img_resized = tf_nn_downscale(img_mono)
     img = array_to_img(img_resized)
     # img = img.resize(
     #    (int(img.width * RESIZE_RATIO), int(img.height * RESIZE_RATIO)))

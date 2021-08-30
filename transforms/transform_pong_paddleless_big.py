@@ -1,15 +1,17 @@
-import sys
 import os
-import numpy as np
-import cv2
+os.add_dll_directory(
+    "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v11.4\\bin")
+
+# Configuring GPU
+
 import tensorflow as tf
-from keras.preprocessing.image import load_img
-from keras.preprocessing.image import img_to_array
-from keras.preprocessing.image import array_to_img
 from skimage.measure import block_reduce
-
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+from keras.preprocessing.image import array_to_img
+from keras.preprocessing.image import img_to_array
+from keras.preprocessing.image import load_img
+import cv2
+import numpy as np
+import sys
 
 
 # The following numbers represent the fraction of the image to be cropped in the Y and X axis.
@@ -140,9 +142,8 @@ if __name__ == "__main__":
             continue
         img_converted, has_ball = conversion_pipe_ball(img)
         if has_ball:
-            # img_converted.save(
-            #    f"images_paddleless_big/pong_paddleless_big_{start + i}.png")
-            pass
+            img_converted.save(
+                f"images_paddleless_big/pong_paddleless_big_{start + i}.png")
         else:
             print(f"Image {start + i} contains no ball, not saved.")
         print("Processed", start + i)

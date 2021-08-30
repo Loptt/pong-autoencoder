@@ -10,6 +10,11 @@ from transforms.transform_pong_paddleless_big import conversion_pipe as transfor
 from keras.models import load_model
 from keras.preprocessing.image import img_to_array
 from keras.preprocessing.image import array_to_img
+import matplotlib.pyplot as plt
+
+plt.ion()
+fig = plt.figure()
+ax = fig.add_subplot(111)
 
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -44,10 +49,30 @@ else:
     model['W1'] = np.random.randn(H, D) / np.sqrt(D)  # "Xavier" initialization
     model['W2'] = np.random.randn(H) / np.sqrt(H)
 
+line1, = ax.plot([], [], 'b')
+
 # update buffers that add up gradients over a batch
 grad_buffer = {k: np.zeros_like(v) for k, v in model.items()}
 rmsprop_cache = {k: np.zeros_like(v)
                  for k, v in model.items()}  # rmsprop memory
+
+
+def show_history(history, line, fig):
+    running_average = []
+    window = 100
+
+    for i in range(window//2, len(history)-(window//2)):
+        avg = 0
+        for j in range(i - window//2, i + window//2):
+            avg += history[j][1]
+
+        avg /= window
+        running_average.append(avg)
+
+    line.set_ydata(running_average)
+    line.set_xdata(range(len(running_average)))
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
 
 def sigmoid(x):
@@ -161,6 +186,7 @@ while True:
 
     if done:  # an episode finished
         episode_number += 1
+        show_history(history, line1, fig)
 
         # stack together all inputs, hidden states, action gradients, and rewards for this episode
         epx = np.vstack(xs)

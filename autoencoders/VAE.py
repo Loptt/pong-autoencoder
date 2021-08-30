@@ -32,7 +32,7 @@ class VAE():
         batch_input.insert(0, None)
         batch_input = tuple(batch_input)
         self.model.build(batch_input)
-        self.model.compile(optimizer=keras.optimizers.Adam())
+        self.model.compile(optimizer='adam')
 
     def create_encoder(self):
         filters = self.initial_filters
@@ -147,7 +147,7 @@ class VAEPerceptual(VAE):
 
 
 class VAEBallTrack(VAE):
-    def __init__(self, layers, input_shape, latent_size, kernel_size, name):
+    def __init__(self, layers, input_shape, latent_size, kernel_size, filters, name):
         super().__init__(layers, input_shape, latent_size,
                          kernel_size=kernel_size, filters=filters, name=name)
 
@@ -244,8 +244,9 @@ class VAECoordConv(VAE):
         filters = self.final_filters
 
         input_decoder = Input(shape=(self.latent_size,), name='input_decoder')
+        x = CoordinateChannel2D()(input_decoder)
 
-        dec = layers.Dense(self.flat_size, name="decoding")(input_decoder)
+        dec = layers.Dense(self.flat_size, name="decoding")(x)
         reshaped = layers.Reshape(self.reshaping_shape, name='reshape')(dec)
         x = reshaped
 
@@ -262,7 +263,6 @@ class VAECoordConv(VAE):
         kernel_y = x.shape[1] - self.input_shape[0] + 1
         kernel_x = x.shape[2] - self.input_shape[1] + 1
 
-        x = CoordinateChannel2D()(x)
         # Add coordinate filter in last conv layer
         decoded = layers.Conv2D(
             self.input_shape[-1], (kernel_y, kernel_x), activation='sigmoid', padding='valid', name='output')(x)

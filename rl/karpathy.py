@@ -2,6 +2,7 @@
 import numpy as np
 import pickle as pickle
 import gym
+import time
 
 # hyperparameters
 H = 200  # number of hidden layer neurons
@@ -10,7 +11,7 @@ learning_rate = 1e-4
 gamma = 0.99  # discount factor for reward
 decay_rate = 0.99  # decay factor for RMSProp leaky sum of grad^2
 resume = True  # resume from previous checkpoint?
-render = True
+render = False
 history = []
 episode_number = 0
 
@@ -91,6 +92,7 @@ while True:
     cur_x = prepro(observation)
     x = cur_x - prev_x if prev_x is not None else np.zeros(D)
     prev_x = cur_x
+    #time.sleep(0.05)
 
     # forward the policy network and sample an action from the returned probability
     aprob, h = policy_forward(x)

@@ -1,5 +1,9 @@
 import sys
+
 import os
+os.add_dll_directory(
+    "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v11.4\\bin")
+
 import numpy as np
 import cv2
 import tensorflow as tf
